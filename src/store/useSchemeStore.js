@@ -125,6 +125,8 @@ export const useSchemeStore = create((set, get) => ({
     });
   },
 
+  setLeftPanelOpen: (isOpen) => set({ isLeftPanelOpen: isOpen }),
+
   // Folder Operations
   createFolder: (name, parentId = null) => {
     const newFolder = {
@@ -138,6 +140,13 @@ export const useSchemeStore = create((set, get) => ({
   renameFolder: (folderId, newName) => {
     set((state) => ({
       folders: state.folders.map((f) => (f.id === folderId ? { ...f, name: newName } : f)),
+    }));
+  },
+
+  moveFolder: (folderId, targetParentId) => {
+    if (folderId === targetParentId) return;
+    set((state) => ({
+      folders: state.folders.map((f) => (f.id === folderId ? { ...f, parentId: targetParentId } : f)),
     }));
   },
 

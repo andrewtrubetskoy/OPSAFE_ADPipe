@@ -45,11 +45,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Play', sans-serif !important;
+  font-family: 'Play', sans-serif;
 }
 
 body {
-  font-family: 'Play', sans-serif !important;
+  font-family: 'Play', sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   height: 100vh;
@@ -59,7 +59,7 @@ body {
 }
 
 button, input, select, textarea {
-  font-family: 'Play', sans-serif !important;
+  font-family: 'Play', sans-serif;
 }
 
 #root {
@@ -70,7 +70,22 @@ button, input, select, textarea {
 }
 
 code, pre {
-  font-family: 'JetBrains Mono', 'Play', monospace !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Dedicated Code Editor class to force 100% identical JetBrains Mono font metrics across all pre child elements and textarea */
+.python-code-editor-layer,
+.python-code-editor-layer * {
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace !important;
+  font-size: 14px !important;
+  line-height: 21px !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  letter-spacing: 0px !important;
+  word-spacing: 0px !important;
+  tab-size: 4 !important;
+  -moz-tab-size: 4 !important;
+  -webkit-tab-size: 4 !important;
 }
 
 /* Custom Scrollbars */
@@ -99,38 +114,39 @@ code, pre {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
-  color: #fff;
-  border: none;
+  background: linear-gradient(135deg, var(--accent-primary), #1d4ed8);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
   padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   transition: var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
 }
 
 .btn-secondary {
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
   font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   transition: var(--transition-fast);
 }
 
@@ -140,64 +156,79 @@ code, pre {
 }
 
 .btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
   background: transparent;
-  border: 1px solid transparent;
   color: var(--text-secondary);
-  display: flex;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   transition: var(--transition-fast);
 }
 
 .btn-icon:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-color);
 }
 
-.btn-icon.active {
-  background: var(--bg-active);
-  color: var(--accent-primary);
-  border-color: var(--border-accent);
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
-/* React Flow Theme Overrides */
-.react-flow {
-  background-color: var(--bg-primary) !important;
-  font-family: 'Play', sans-serif !important;
+.badge-blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* React Flow Canvas Tweaks */
+.react-flow__node {
+  border-radius: var(--radius-md);
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-primary);
+  border: 2px solid #0f172a;
 }
 
 .react-flow__controls {
-  background: var(--bg-glass) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-md) !important;
-  backdrop-filter: blur(12px);
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  border: 1px solid var(--border-color) !important;
 }
 
 .react-flow__controls-button {
-  background: transparent !important;
+  background: var(--bg-secondary) !important;
   border-bottom: 1px solid var(--border-color) !important;
-  color: var(--text-secondary) !important;
   fill: var(--text-secondary) !important;
 }
 
 .react-flow__controls-button:hover {
   background: var(--bg-hover) !important;
-  color: var(--text-primary) !important;
   fill: var(--text-primary) !important;
-}
-
-.react-flow__minimap {
-  background: var(--bg-glass) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--radius-md) !important;
-}
-
-.react-flow__edge-path {
-  stroke-width: 2.5;
 }

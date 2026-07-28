@@ -2,9 +2,11 @@ import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Code2, Sliders, FileType, Plus, Trash2 } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
+import { useScriptLibraryStore } from '../../store/useScriptLibraryStore';
 
 export function ScriptNode({ id, data, selected }) {
   const { setSelectedNodeId, updateNodeData } = useSchemeStore();
+  const scriptItems = useScriptLibraryStore((state) => state.scriptItems);
 
   const inputs = data.input_data_elem_list || [{ data_type: 'geojson' }];
   // All inputs share the same uniform data type
@@ -79,8 +81,52 @@ export function ScriptNode({ id, data, selected }) {
         </span>
       </div>
 
-      <div style={{ fontWeight: 600, fontSize: '0.94rem', color: '#f8fafc', marginBottom: '4px' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.94rem', color: '#f8fafc', marginBottom: '6px' }}>
         {data.name || 'Скрипт обробки'}
+      </div>
+
+      {/* Script Library Quick Selector on Node Card */}
+      <div style={{ marginBottom: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <select
+          value={data.libraryScriptId || ''}
+          onChange={(e) => {
+            const selectedId = parseInt(e.target.value, 10);
+            const scriptItem = scriptItems.find((s) => s.id === selectedId);
+            if (scriptItem) {
+              updateNodeData(id, {
+                libraryScriptId: scriptItem.id,
+                name: scriptItem.name,
+                desc: scriptItem.description,
+                script_text: scriptItem.code,
+                input_data_elem_list: (data.input_data_elem_list || [{}]).map((inp) => ({
+                  ...inp,
+                  data_type: scriptItem.inputType || 'geojson',
+                })),
+                output_data_elem: { data_type: scriptItem.outputType || 'geojson' },
+              });
+            } else {
+              updateNodeData(id, { libraryScriptId: null });
+            }
+          }}
+          style={{
+            width: '100%',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            fontSize: '0.74rem',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            color: '#fbbf24',
+            cursor: 'pointer',
+          }}
+          title="Обрати реалізацію скрипта з БД Бібліотеки"
+        >
+          <option value="">-- Вибрати скрипт з бібліотеки БД --</option>
+          {scriptItems.map((s) => (
+            <option key={s.id} value={s.id}>
+              📄 {s.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {data.desc && (

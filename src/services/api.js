@@ -84,3 +84,52 @@ export const folderApi = {
     return response.data;
   },
 };
+
+export const scriptLibraryApi = {
+  getFolders: async () => {
+    const response = await api.get('/script-folders');
+    return response.data;
+  },
+  createFolder: async (folder) => {
+    const response = await api.post('/script-folders', folder);
+    return response.data;
+  },
+  deleteFolder: async (id) => {
+    const response = await api.delete(`/script-folders/${id}`);
+    return response.data;
+  },
+  moveFolder: async (id, parentId) => {
+    const url = parentId ? `/script-folders/${id}/move?parentId=${parentId}` : `/script-folders/${id}/move`;
+    const response = await api.put(url);
+    return response.data;
+  },
+  getScripts: async () => {
+    const response = await api.get('/scripts');
+    return response.data;
+  },
+  createScript: async (script) => {
+    const response = await api.post('/scripts', script);
+    return response.data;
+  },
+  updateScript: async (script) => {
+    const response = await api.post('/scripts', script);
+    return response.data;
+  },
+  uploadScript: async (formData) => {
+    const response = await api.post('/scripts/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  moveScript: async (id, folderId) => {
+    const url = folderId ? `/scripts/${id}/move?folderId=${folderId}` : `/scripts/${id}/move`;
+    const response = await api.put(url);
+    return response.data;
+  },
+  deleteScript: async (id) => {
+    const response = await api.delete(`/scripts/${id}`);
+    return response.data;
+  },
+};

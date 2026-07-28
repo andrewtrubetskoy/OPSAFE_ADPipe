@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Trash2, Plus, Sliders, Code2, Save, FileType } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
+import { useScriptLibraryStore } from '../../store/useScriptLibraryStore';
+import { PythonCodeModal } from '../modals/PythonCodeModal';
 
 export function NodeInspector() {
   const { nodes, selectedNodeId, setSelectedNodeId, updateNodeData, deleteNode } = useSchemeStore();
+  const scriptItems = useScriptLibraryStore((state) => state.scriptItems);
+
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   const node = nodes.find((n) => n.id === selectedNodeId);
   if (!node) return null;
@@ -192,6 +197,41 @@ export function NodeInspector() {
         {/* SCRIPT NODE FIELDS */}
         {node.type === 'scriptNode' && (
           <>
+            {/* Script Library Selector */}
+            <div>
+              <label style={{ ...labelStyle, color: '#fbbf24' }}>Обрати скрипт з бібліотеки (БД)</label>
+              <select
+                value={data.libraryScriptId || ''}
+                onChange={(e) => {
+                  const selectedId = parseInt(e.target.value, 10);
+                  const scriptItem = scriptItems.find((s) => s.id === selectedId);
+                  if (scriptItem) {
+                    updateNodeData(selectedNodeId, {
+                      libraryScriptId: scriptItem.id,
+                      name: scriptItem.name,
+                      desc: scriptItem.description,
+                      script_text: scriptItem.code,
+                      input_data_elem_list: (data.input_data_elem_list || [{}]).map((inp) => ({
+                        ...inp,
+                        data_type: scriptItem.inputType || 'geojson',
+                      })),
+                      output_data_elem: { data_type: scriptItem.outputType || 'geojson' },
+                    });
+                  } else {
+                    updateNodeData(selectedNodeId, { libraryScriptId: null });
+                  }
+                }}
+                style={{ ...inputStyle, borderColor: 'rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.1)' }}
+              >
+                <option value="">-- Власна реалізація кодy --</option>
+                {scriptItems.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    📄 {s.name} ({s.inputType} → {s.outputType})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Uniform Input Data Type & List Management */}
             <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -245,11 +285,59 @@ export function NodeInspector() {
 
             <div>
               <label style={labelStyle}>Код Python скрипта</label>
-              <textarea
-                value={data.script_text || ''}
-                onChange={(e) => handleFieldChange('script_text', e.target.value)}
-                rows={4}
-                style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.78rem' }}
+              <button
+                onClick={() => setIsCodeModalOpen(true)}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  padding: '9px 12px',
+                  fontSize: '0.82rem',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2))',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: '#fbbf24',
+                  marginBottom: '8px',
+                }}
+              >
+                <Code2 className="w-4 h-4 text-amber-400" />
+                Відкрити редактор коду Python (з підсвіткою)
+              </button>
+
+              {/* Code Preview Box */}
+              <div
+                onClick={() => setIsCodeModalOpen(true)}
+                style={{
+                  padding: '8px 10px',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontSize: '0.74rem',
+                  color: '#94a3b8',
+                  maxHeight: '70px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+                title="Натисніть для редагування коду"
+              >
+                {data.script_text ? (
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {data.script_text.split('\n').slice(0, 3).join('\n')}
+                    {data.script_text.split('\n').length > 3 && '\n...'}
+                  </pre>
+                ) : (
+                  <span style={{ color: '#64748b', italic: 'true' }}>(Порожній скрипт. Натисніть кнопку вище, щоб вписати код)</span>
+                )}
+              </div>
+
+              {/* Modal python editor */}
+              <PythonCodeModal
+                isOpen={isCodeModalOpen}
+                onClose={() => setIsCodeModalOpen(false)}
+                initialCode={data.script_text || ''}
+                scriptName={data.name || 'Python Скрипт'}
+                onSave={(updatedCode) => handleFieldChange('script_text', updatedCode)}
               />
             </div>
 

@@ -1,11 +1,22 @@
 import React from 'react';
-import { GitFork, Shield, Settings, HelpCircle } from 'lucide-react';
+import { GitFork, Code2, Shield, Settings, HelpCircle } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
+import { useScriptLibraryStore } from '../../store/useScriptLibraryStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export function LeftNarrowBar({ onOpenAdmin }) {
-  const { activeLeftTab, isLeftPanelOpen, toggleLeftPanel } = useSchemeStore();
+  const { isLeftPanelOpen, setLeftPanelOpen } = useSchemeStore();
+  const { activePanelTab, setActivePanelTab } = useScriptLibraryStore();
   const { user } = useAuthStore();
+
+  const handleTabClick = (tab) => {
+    if (activePanelTab === tab && isLeftPanelOpen) {
+      setLeftPanelOpen(false);
+    } else {
+      setActivePanelTab(tab);
+      setLeftPanelOpen(true);
+    }
+  };
 
   return (
     <aside
@@ -22,9 +33,10 @@ export function LeftNarrowBar({ onOpenAdmin }) {
         zIndex: 30,
       }}
     >
+      {/* 1. SCHEMES PANEL TAB */}
       <button
-        onClick={() => toggleLeftPanel('scheme')}
-        className={`btn-icon ${activeLeftTab === 'scheme' && isLeftPanelOpen ? 'active' : ''}`}
+        onClick={() => handleTabClick('schemes')}
+        className={`btn-icon ${activePanelTab === 'schemes' && isLeftPanelOpen ? 'active' : ''}`}
         title="Схеми та папки"
         style={{
           width: '38px',
@@ -33,6 +45,21 @@ export function LeftNarrowBar({ onOpenAdmin }) {
         }}
       >
         <GitFork className="w-5 h-5" />
+      </button>
+
+      {/* 2. SCRIPT LIBRARY TAB */}
+      <button
+        onClick={() => handleTabClick('scripts')}
+        className={`btn-icon ${activePanelTab === 'scripts' && isLeftPanelOpen ? 'active' : ''}`}
+        title="Бібліотека Python скриптів"
+        style={{
+          width: '38px',
+          height: '38px',
+          borderRadius: '10px',
+          color: activePanelTab === 'scripts' && isLeftPanelOpen ? '#fbbf24' : undefined,
+        }}
+      >
+        <Code2 className="w-5 h-5" />
       </button>
 
       {user?.role === 'admin' && (
