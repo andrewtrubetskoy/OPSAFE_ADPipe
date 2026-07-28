@@ -45,12 +45,40 @@ export function SchemeCanvas() {
     [setEdges]
   );
 
+  const isValidConnection = useCallback(
+    (connection) => {
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+
+      if (!sourceNode || !targetNode) return false;
+
+      // Block connection if scriptNode has no script assigned
+      if (sourceNode.type === 'scriptNode' && (!sourceNode.data?.libraryScriptId || !sourceNode.data?.script_text)) {
+        return false;
+      }
+      if (targetNode.type === 'scriptNode' && (!targetNode.data?.libraryScriptId || !targetNode.data?.script_text)) {
+        return false;
+      }
+
+      return true;
+    },
+    [nodes]
+  );
+
   const onConnect = useCallback(
     (connection) => {
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
 
       if (!sourceNode || !targetNode) return;
+
+      // Block connections if scriptNode has no script assigned
+      if (sourceNode.type === 'scriptNode' && (!sourceNode.data?.libraryScriptId || !sourceNode.data?.script_text)) {
+        return;
+      }
+      if (targetNode.type === 'scriptNode' && (!targetNode.data?.libraryScriptId || !targetNode.data?.script_text)) {
+        return;
+      }
 
       // Extract source data type
       let sourceDataType = 'geojson';
@@ -74,6 +102,8 @@ export function SchemeCanvas() {
         targetDataType = targetNode.data?.input_data_elem_list?.[idx]?.data_type || 'geojson';
       }
 
+      if (!sourceDataType || !targetDataType) return;
+
       // Type matching validation
       const isTypeMatch = sourceDataType === targetDataType;
       const strokeColor = isTypeMatch ? (sourceDataType === 'geojson' ? '#10b981' : '#3b82f6') : '#f43f5e';
@@ -87,7 +117,7 @@ export function SchemeCanvas() {
       };
 
       setEdges((eds) => {
-        // Enforce 1 connection per input handle rule: filter out any existing edge connected to the SAME target handle
+        // Enforce 1 connection per input handle rule
         const filteredEdges = eds.filter(
           (e) => !(e.target === connection.target && e.targetHandle === connection.targetHandle)
         );
@@ -109,36 +139,37 @@ export function SchemeCanvas() {
   }, [setSelectedNodeId]);
 
   return (
-    <div style={{ flex: 1, height: 'calc(100vh - 52px)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <CanvasToolbar />
+      <NodeInspector />
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
+        colorMode="dark"
       >
         <Background color="#1e293b" gap={20} size={1} />
         <Controls />
         <MiniMap
           nodeColor={(n) => {
-            if (n.type === 'streamNode') return '#10b981';
-            if (n.type === 'converterNode') return '#8b5cf6';
+            if (n.type === 'streamNode') return '#06b6d4';
             if (n.type === 'scriptNode') return '#f59e0b';
+            if (n.type === 'converterNode') return '#8b5cf6';
             return '#3b82f6';
           }}
+          maskColor="rgba(15, 23, 42, 0.7)"
+          style={{ background: '#090d16', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px' }}
         />
       </ReactFlow>
-
-      {/* Vertical Floating Canvas Toolbar */}
-      <CanvasToolbar />
-
-      {/* Node Inspector Panel when a node is selected */}
-      {selectedNodeId && <NodeInspector />}
     </div>
   );
 }

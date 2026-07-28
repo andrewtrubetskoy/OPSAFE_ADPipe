@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Code2, Copy, Check, Save, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Code2, Copy, Check, Save, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
+import { validatePythonScript } from '../../utils/scriptValidator';
 
 export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName = 'Скрипт Python', onSave }) {
   const [code, setCode] = useState(() => (initialCode || '').replace(/\t/g, '    '));
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
   const textareaRef = useRef(null);
   const preRef = useRef(null);
   const lineSidebarRef = useRef(null);
 
   useEffect(() => {
-    setCode((initialCode || '').replace(/\t/g, '    '));
+    const formatted = (initialCode || '').replace(/\t/g, '    ');
+    setCode(formatted);
+    const val = validatePythonScript(formatted);
+    setValidationErrors(val.isValid ? [] : val.errors);
   }, [initialCode, isOpen]);
 
   if (!isOpen) return null;
@@ -26,6 +31,12 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
   };
 
   const handleSave = () => {
+    const validation = validatePythonScript(code);
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      return;
+    }
+    setValidationErrors([]);
     if (onSave) onSave(code);
     onClose();
   };
@@ -37,6 +48,8 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
       const end = e.target.selectionEnd;
       const newCode = code.substring(0, start) + '    ' + code.substring(end);
       setCode(newCode);
+      const val = validatePythonScript(newCode);
+      setValidationErrors(val.isValid ? [] : val.errors);
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
@@ -51,7 +64,7 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
     }
   };
 
-  // Robust Single-Pass Python Highlighting Lexer (Strictly font-style: normal)
+  // Robust Single-Pass Python Highlighting Lexer
   const highlightPython = (src) => {
     if (!src) return '';
 
@@ -154,7 +167,7 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
           height: isFullscreen ? '100vh' : '88vh',
           maxWidth: isFullscreen ? '100vw' : '1360px',
           borderRadius: isFullscreen ? '0' : '16px',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
+          border: validationErrors.length > 0 ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid rgba(245, 158, 11, 0.4)',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85)',
           display: 'flex',
           flexDirection: 'column',
@@ -213,6 +226,29 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
           </div>
         </div>
 
+        {/* Validation Errors Alert Banner */}
+        {validationErrors.length > 0 && (
+          <div
+            style={{
+              padding: '10px 20px',
+              background: 'rgba(244, 63, 94, 0.15)',
+              borderBottom: '1px solid rgba(244, 63, 94, 0.3)',
+              color: '#fecdd3',
+              fontSize: '0.8rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: '#f43f5e', marginBottom: '4px' }}>
+              <AlertTriangle className="w-4 h-4" />
+              ВІДМОВА У ЗБЕРЕЖЕННІ! Код не відповідає вимогам шаблону (script_template.py):
+            </div>
+            <ul style={{ paddingLeft: '24px', margin: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {validationErrors.map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Code Editor Body */}
         <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', background: '#090d16' }}>
           {/* Line Numbers Sidebar */}
@@ -267,7 +303,12 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
               ref={textareaRef}
               className="python-code-editor-layer"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\t/g, '    '))}
+              onChange={(e) => {
+                const valStr = e.target.value.replace(/\t/g, '    ');
+                setCode(valStr);
+                const val = validatePythonScript(valStr);
+                setValidationErrors(val.isValid ? [] : val.errors);
+              }}
               onKeyDown={handleKeyDown}
               spellCheck="false"
               autoFocus
@@ -296,7 +337,7 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
           }}
         >
           <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-            💡 Повнофункціональний редактор з підсвіткою синтаксису Python 3.x. Підтримується клавіша Tab для відступів.
+            💡 Обов'язкові компоненти: <code style={{ color: '#38bdf8' }}>ConfigSchema(BaseModel)</code>, <code style={{ color: '#c084fc' }}>FeedbackHandler</code>, <code style={{ color: '#f59e0b' }}>def process_data(...)</code>.
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button onClick={onClose} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
@@ -304,11 +345,13 @@ export function PythonCodeModal({ isOpen, onClose, initialCode = '', scriptName 
             </button>
             <button
               onClick={handleSave}
+              disabled={validationErrors.length > 0}
               className="btn-primary"
               style={{
                 padding: '8px 20px',
                 fontSize: '0.82rem',
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                background: validationErrors.length > 0 ? '#475569' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                cursor: validationErrors.length > 0 ? 'not-allowed' : 'pointer',
               }}
             >
               <Save className="w-4 h-4" />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Upload, FileCode, FolderPlus, Save } from 'lucide-react';
+import { X, Upload, FileCode, Save, AlertTriangle } from 'lucide-react';
 import { useScriptLibraryStore } from '../../store/useScriptLibraryStore';
+import { validatePythonScript } from '../../utils/scriptValidator';
 
 export function UploadScriptModal({ isOpen, onClose }) {
   const { scriptFolders, uploadScript, createScript } = useScriptLibraryStore();
@@ -13,6 +14,7 @@ export function UploadScriptModal({ isOpen, onClose }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [codeText, setCodeText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   if (!isOpen) return null;
 
@@ -20,13 +22,20 @@ export function UploadScriptModal({ isOpen, onClose }) {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
+      setValidationErrors([]);
       if (!name) {
         setName(file.name.replace(/\.py$/, ''));
       }
-      // Read text content
       const reader = new FileReader();
       reader.onload = (evt) => {
-        setCodeText(evt.target.result);
+        const text = evt.target.result || '';
+        setCodeText(text);
+        const validation = validatePythonScript(text);
+        if (!validation.isValid) {
+          setValidationErrors(validation.errors);
+        } else {
+          setValidationErrors([]);
+        }
       };
       reader.readAsText(file);
     }
@@ -36,31 +45,40 @@ export function UploadScriptModal({ isOpen, onClose }) {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const codeToValidate = codeText || '';
+    const validation = validatePythonScript(codeToValidate);
+
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      return;
+    }
+
+    setValidationErrors([]);
     setIsSubmitting(true);
+
     try {
+      const scriptPayload = {
+        name,
+        description: description || 'Скрипт з бібліотеки',
+        code: codeText,
+        inputType,
+        outputType,
+        folderId: folderId ? parseInt(folderId, 10) : null,
+      };
+
       if (selectedFile) {
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append('name', name);
-        formData.append('description', description);
-        if (folderId) formData.append('folderId', folderId);
-        await uploadScript(formData);
+        await uploadScript(scriptPayload, codeText);
       } else {
-        await createScript({
-          name,
-          description: description || 'Скрипт з бібліотеки',
-          code: codeText || '# Python script code\npass',
-          inputType,
-          outputType,
-          folderId: folderId ? parseInt(folderId, 10) : null,
-        });
+        await createScript(scriptPayload);
       }
+
       onClose();
       // Reset form
       setName('');
       setDescription('');
       setSelectedFile(null);
       setCodeText('');
+      setValidationErrors([]);
     } catch (err) {
       console.error('Failed to save script:', err);
     } finally {
@@ -84,7 +102,7 @@ export function UploadScriptModal({ isOpen, onClose }) {
       <div
         className="glass-panel"
         style={{
-          width: '520px',
+          width: '560px',
           maxHeight: '90vh',
           overflowY: 'auto',
           borderRadius: '16px',
@@ -92,7 +110,7 @@ export function UploadScriptModal({ isOpen, onClose }) {
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ padding: '8px', background: 'rgba(245, 158, 11, 0.15)', borderRadius: '10px', color: '#fbbf24' }}>
               <FileCode className="w-5 h-5" />
@@ -111,15 +129,40 @@ export function UploadScriptModal({ isOpen, onClose }) {
           </button>
         </div>
 
+        {/* Validation Errors Alert Banner */}
+        {validationErrors.length > 0 && (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              background: 'rgba(244, 63, 94, 0.12)',
+              border: '1px solid rgba(244, 63, 94, 0.4)',
+              color: '#fecdd3',
+              fontSize: '0.82rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: '#f43f5e', marginBottom: '6px' }}>
+              <AlertTriangle className="w-4 h-4" />
+              ВІДМОВА У ДОДАВАННІ! Скрипт не відповідає вимогам:
+            </div>
+            <ul style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {validationErrors.map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* File Upload Box */}
           <div
             style={{
-              border: '2px dashed rgba(245, 158, 11, 0.35)',
+              border: validationErrors.length > 0 ? '2px dashed rgba(244, 63, 94, 0.5)' : '2px dashed rgba(245, 158, 11, 0.35)',
               borderRadius: '12px',
               padding: '16px',
               textAlign: 'center',
-              background: 'rgba(245, 158, 11, 0.05)',
+              background: validationErrors.length > 0 ? 'rgba(244, 63, 94, 0.05)' : 'rgba(245, 158, 11, 0.05)',
             }}
           >
             <input
@@ -135,7 +178,7 @@ export function UploadScriptModal({ isOpen, onClose }) {
                 {selectedFile ? selectedFile.name : 'Вибрати .py файл з комп’ютера'}
               </span>
               <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'або введіть код вручну нижче'}
+                {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'або введіть код вручну'}
               </span>
             </label>
           </div>
@@ -148,64 +191,95 @@ export function UploadScriptModal({ isOpen, onClose }) {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="напр. Фільтрація шару буфером"
+              placeholder="Наприклад: Буферний фільтр геометрій"
               style={inputStyle}
             />
+          </div>
+
+          {/* Folder */}
+          <div>
+            <label style={labelStyle}>Папка в бібліотеці</label>
+            <select value={folderId} onChange={(e) => setFolderId(e.target.value)} style={inputStyle}>
+              <option value="">(Без папки / Корінь)</option>
+              {scriptFolders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Types */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={labelStyle}>Вхідний тип</label>
+              <select value={inputType} onChange={(e) => setInputType(e.target.value)} style={inputStyle}>
+                <option value="geojson">GeoJSON</option>
+                <option value="csv">CSV / Data</option>
+                <option value="shapefile">Shapefile</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Вихідний тип</label>
+              <select value={outputType} onChange={(e) => setOutputType(e.target.value)} style={inputStyle}>
+                <option value="geojson">GeoJSON</option>
+                <option value="csv">CSV / Data</option>
+                <option value="shapefile">Shapefile</option>
+              </select>
+            </div>
           </div>
 
           {/* Description */}
           <div>
             <label style={labelStyle}>Опис</label>
             <textarea
+              rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Короткий опис роботи алгоритму..."
-              rows={2}
-              style={inputStyle}
+              placeholder="Короткий опис призначенню та алгоритму"
+              style={{ ...inputStyle, resize: 'none' }}
             />
           </div>
 
-          {/* Folder selection */}
-          <div>
-            <label style={labelStyle}>Папка в бібліотеці</label>
-            <select
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">(Корінь бібліотеки)</option>
-              {scriptFolders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  📁 {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Code Textarea if no file selected */}
+          {!selectedFile && (
+            <div>
+              <label style={labelStyle}>Код Python (має відповідати script_template.py)</label>
+              <textarea
+                rows={5}
+                value={codeText}
+                onChange={(e) => {
+                  setCodeText(e.target.value);
+                  const val = validatePythonScript(e.target.value);
+                  setValidationErrors(val.isValid ? [] : val.errors);
+                }}
+                placeholder="Введіть Python код..."
+                style={{
+                  ...inputStyle,
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+          )}
 
-          {/* Code Text editor */}
-          <div>
-            <label style={labelStyle}>Код Python</label>
-            <textarea
-              value={codeText}
-              onChange={(e) => setCodeText(e.target.value)}
-              rows={6}
-              placeholder="# Напишіть Python код тут..."
-              style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.78rem' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+          {/* Submit */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
             <button type="button" onClick={onClose} className="btn-secondary">
               Скасувати
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !name.trim()}
+              disabled={isSubmitting || validationErrors.length > 0}
               className="btn-primary"
-              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+              style={{
+                background: validationErrors.length > 0 ? '#475569' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                cursor: validationErrors.length > 0 ? 'not-allowed' : 'pointer',
+              }}
             >
               <Save className="w-4 h-4" />
-              {isSubmitting ? 'Збереження...' : 'Зберегти до бібліотеки'}
+              {isSubmitting ? 'Збереження...' : 'Зберегти в бібліотеку'}
             </button>
           </div>
         </form>
@@ -215,11 +289,11 @@ export function UploadScriptModal({ isOpen, onClose }) {
 }
 
 const labelStyle = {
-  fontSize: '0.76rem',
-  fontWeight: 600,
-  color: '#94a3b8',
-  marginBottom: '4px',
   display: 'block',
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: '#cbd5e1',
+  marginBottom: '4px',
 };
 
 const inputStyle = {
@@ -227,7 +301,8 @@ const inputStyle = {
   padding: '8px 12px',
   borderRadius: '8px',
   background: 'rgba(0, 0, 0, 0.4)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  color: '#f1f5f9',
-  fontSize: '0.84rem',
+  border: '1px solid rgba(255, 255, 255, 0.15)',
+  color: '#fff',
+  fontSize: '0.85rem',
+  outline: 'none',
 };

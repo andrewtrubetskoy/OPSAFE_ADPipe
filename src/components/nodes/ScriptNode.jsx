@@ -1,33 +1,33 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Code2, Sliders, FileType, Plus, Trash2 } from 'lucide-react';
+import { Code2, Sliders, FileType, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
 import { useScriptLibraryStore } from '../../store/useScriptLibraryStore';
+import { parseConfigSchema } from '../../utils/configSchemaParser';
 
 export function ScriptNode({ id, data, selected }) {
   const { setSelectedNodeId, updateNodeData } = useSchemeStore();
   const scriptItems = useScriptLibraryStore((state) => state.scriptItems);
 
-  const inputs = data.input_data_elem_list || [{ data_type: 'geojson' }];
-  // All inputs share the same uniform data type
-  const sharedInputDataType = inputs[0]?.data_type || 'geojson';
-  const outputDataType = data.output_data_elem?.data_type || 'geojson';
-  const paramsCount = data.script_params_list?.length || 0;
+  const currentScript = scriptItems.find((s) => s.id === data.libraryScriptId);
+  const scriptCode = currentScript?.code || data.script_text || '';
+  const isScriptSelected = Boolean(data.libraryScriptId && scriptCode);
+
+  const inputs = data.input_data_elem_list || [{ data_type: isScriptSelected ? (currentScript?.inputType || 'geojson') : null }];
+  const sharedInputDataType = isScriptSelected ? (currentScript?.inputType || 'geojson') : null;
+  const outputDataType = isScriptSelected ? (currentScript?.outputType || 'geojson') : null;
+
+  const parsedConfigSchemaFields = parseConfigSchema(scriptCode);
+  const paramsCount = parsedConfigSchemaFields.length;
 
   const isOutputGeoJSON = outputDataType === 'geojson';
+  const isSharedGeoJSON = sharedInputDataType === 'geojson';
 
-  // Helper to add a new input data element (inherits the shared input data type)
+  // Helper to add a new input data element
   const handleAddInputElem = (e) => {
     e.stopPropagation();
+    if (!isScriptSelected) return;
     const updatedInputs = [...inputs, { data_type: sharedInputDataType }];
-    updateNodeData(id, { input_data_elem_list: updatedInputs });
-  };
-
-  // Helper to toggle the shared input data type for ALL inputs on this script node
-  const handleToggleSharedInputType = (e) => {
-    e.stopPropagation();
-    const newType = sharedInputDataType === 'geojson' ? 'csv' : 'geojson';
-    const updatedInputs = inputs.map((inp) => ({ ...inp, data_type: newType }));
     updateNodeData(id, { input_data_elem_list: updatedInputs });
   };
 
@@ -39,8 +39,6 @@ export function ScriptNode({ id, data, selected }) {
     updateNodeData(id, { input_data_elem_list: updatedInputs });
   };
 
-  const isSharedGeoJSON = sharedInputDataType === 'geojson';
-
   return (
     <div
       onClick={() => setSelectedNodeId(id)}
@@ -50,7 +48,7 @@ export function ScriptNode({ id, data, selected }) {
         borderRadius: '14px',
         background: 'rgba(18, 24, 38, 0.95)',
         backdropFilter: 'blur(16px)',
-        border: selected ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.35)',
+        border: selected ? '2px solid #f59e0b' : isScriptSelected ? '1px solid rgba(245, 158, 11, 0.35)' : '1px dashed rgba(244, 63, 94, 0.5)',
         boxShadow: selected ? '0 0 24px rgba(245, 158, 11, 0.45)' : '0 6px 20px rgba(0, 0, 0, 0.5)',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
@@ -71,13 +69,13 @@ export function ScriptNode({ id, data, selected }) {
             fontSize: '0.68rem',
             padding: '2px 6px',
             borderRadius: '4px',
-            background: 'rgba(245, 158, 11, 0.2)',
-            color: '#fcd34d',
+            background: isScriptSelected ? 'rgba(245, 158, 11, 0.2)' : 'rgba(244, 63, 94, 0.2)',
+            color: isScriptSelected ? '#fcd34d' : '#fecdd3',
             fontFamily: 'monospace',
             fontWeight: 700,
           }}
         >
-          {data.type || 'python'}
+          {isScriptSelected ? (currentScript?.name || 'обрано') : 'не обрано'}
         </span>
       </div>
 
@@ -93,6 +91,12 @@ export function ScriptNode({ id, data, selected }) {
             const selectedId = parseInt(e.target.value, 10);
             const scriptItem = scriptItems.find((s) => s.id === selectedId);
             if (scriptItem) {
+              const parsedSchema = parseConfigSchema(scriptItem.code);
+              const defaultValues = {};
+              parsedSchema.forEach((field) => {
+                defaultValues[field.name] = field.default;
+              });
+
               updateNodeData(id, {
                 libraryScriptId: scriptItem.id,
                 name: scriptItem.name,
@@ -100,12 +104,19 @@ export function ScriptNode({ id, data, selected }) {
                 script_text: scriptItem.code,
                 input_data_elem_list: (data.input_data_elem_list || [{}]).map((inp) => ({
                   ...inp,
-                  data_type: scriptItem.inputType || 'geojson',
+                  data_type: scriptItem.inputType,
                 })),
-                output_data_elem: { data_type: scriptItem.outputType || 'geojson' },
+                output_data_elem: { data_type: scriptItem.outputType },
+                script_params_values: defaultValues,
               });
             } else {
-              updateNodeData(id, { libraryScriptId: null });
+              updateNodeData(id, {
+                libraryScriptId: null,
+                script_text: '',
+                input_data_elem_list: [{ data_type: null }],
+                output_data_elem: { data_type: null },
+                script_params_values: {},
+              });
             }
           }}
           style={{
@@ -113,70 +124,56 @@ export function ScriptNode({ id, data, selected }) {
             padding: '4px 8px',
             borderRadius: '6px',
             fontSize: '0.74rem',
-            background: 'rgba(245, 158, 11, 0.12)',
-            border: '1px solid rgba(245, 158, 11, 0.35)',
-            color: '#fbbf24',
+            background: isScriptSelected ? 'rgba(245, 158, 11, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+            border: isScriptSelected ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(244, 63, 94, 0.4)',
+            color: isScriptSelected ? '#fbbf24' : '#fecdd3',
             cursor: 'pointer',
           }}
           title="Обрати реалізацію скрипта з БД Бібліотеки"
         >
-          <option value="">-- Вибрати скрипт з бібліотеки БД --</option>
+          <option value="">-- Оберіть скрипт з бібліотеки --</option>
           {scriptItems.map((s) => (
             <option key={s.id} value={s.id}>
-              📄 {s.name}
+              📄 {s.name} ({s.inputType} → {s.outputType})
             </option>
           ))}
         </select>
       </div>
 
-      {data.desc && (
-        <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginBottom: '10px', lineHeight: '1.3' }}>
-          {data.desc}
+      {/* Warning if script is unassigned */}
+      {!isScriptSelected && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#f43f5e', marginBottom: '10px', padding: '4px 8px', background: 'rgba(244, 63, 94, 0.1)', borderRadius: '6px' }}>
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span>Скрипт не вказано! Приєднання заблоковано.</span>
         </div>
       )}
 
-      {/* Script Params count */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '12px', padding: '4px 8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '6px' }}>
-        <Sliders className="w-3.5 h-3.5 text-amber-400" />
-        <span>Параметрів скрипта: <strong>{paramsCount}</strong></span>
-      </div>
+      {/* Script Params count from ConfigSchema */}
+      {isScriptSelected && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '12px', padding: '4px 8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '6px' }}>
+          <Sliders className="w-3.5 h-3.5 text-amber-400" />
+          <span>Параметрів (ConfigSchema): <strong>{paramsCount}</strong></span>
+        </div>
+      )}
 
-      {/* DISTINCT DATA ELEMENTS SECTION */}
+      {/* INPUT / OUTPUT DATA ELEMENTS SECTION */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '10px', alignItems: 'start', paddingTop: '8px', borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
         {/* INPUT DATA ELEMENTS LIST */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Вхідні ({inputs.length})
-              </span>
-              {/* Single Shared Input Type Selector Toggle */}
+            <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+              Вхідні ({inputs.length})
+            </span>
+            {isScriptSelected && (
               <button
-                onClick={handleToggleSharedInputType}
-                style={{
-                  fontSize: '0.64rem',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  padding: '1px 5px',
-                  borderRadius: '4px',
-                  background: isSharedGeoJSON ? 'rgba(16, 185, 129, 0.25)' : 'rgba(59, 130, 246, 0.25)',
-                  color: isSharedGeoJSON ? '#34d399' : '#60a5fa',
-                  border: `1px solid ${isSharedGeoJSON ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`,
-                  cursor: 'pointer',
-                }}
-                title="Змінити єдиний тип вхідних даних для всіх входів цього скрипта"
+                onClick={handleAddInputElem}
+                className="btn-secondary"
+                style={{ padding: '2px 6px', fontSize: '0.68rem', gap: '2px', background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}
+                title="Додати ще один вхідний елемент даних"
               >
-                {sharedInputDataType}
+                <Plus className="w-3 h-3" /> Додати
               </button>
-            </div>
-            <button
-              onClick={handleAddInputElem}
-              className="btn-secondary"
-              style={{ padding: '2px 6px', fontSize: '0.68rem', gap: '2px', background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}
-              title="Додати ще один вхідний елемент даних"
-            >
-              <Plus className="w-3 h-3" /> Додати
-            </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -187,43 +184,51 @@ export function ScriptNode({ id, data, selected }) {
                   position: 'relative',
                   padding: '6px 8px',
                   borderRadius: '6px',
-                  background: isSharedGeoJSON ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-                  border: `1px solid ${isSharedGeoJSON ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
+                  background: !isScriptSelected
+                    ? 'rgba(71, 85, 105, 0.15)'
+                    : isSharedGeoJSON
+                    ? 'rgba(16, 185, 129, 0.12)'
+                    : 'rgba(59, 130, 246, 0.12)',
+                  border: !isScriptSelected
+                    ? '1px dashed rgba(148, 163, 184, 0.3)'
+                    : `1px solid ${isSharedGeoJSON ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}
               >
-                {/* Handle attached directly to this specific input data element block */}
+                {/* Handle attached directly to this input element */}
                 <Handle
                   type="target"
                   position={Position.Left}
                   id={`in-${idx}`}
+                  isConnectable={isScriptSelected}
                   style={{
                     left: '-7px',
                     width: '12px',
                     height: '12px',
-                    background: isSharedGeoJSON ? '#10b981' : '#3b82f6',
+                    background: !isScriptSelected ? '#475569' : isSharedGeoJSON ? '#10b981' : '#3b82f6',
                     borderColor: '#0a0d14',
                     borderWidth: '2px',
+                    cursor: isScriptSelected ? 'crosshair' : 'not-allowed',
                   }}
                 />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <FileType className={`w-3.5 h-3.5 ${isSharedGeoJSON ? 'text-emerald-400' : 'text-blue-400'}`} />
+                  <FileType className={`w-3.5 h-3.5 ${!isScriptSelected ? 'text-slate-500' : isSharedGeoJSON ? 'text-emerald-400' : 'text-blue-400'}`} />
                   <span
                     style={{
                       fontSize: '0.7rem',
                       fontFamily: 'monospace',
                       fontWeight: 700,
-                      color: isSharedGeoJSON ? '#34d399' : '#60a5fa',
+                      color: !isScriptSelected ? '#64748b' : isSharedGeoJSON ? '#34d399' : '#60a5fa',
                     }}
                   >
-                    {sharedInputDataType} #{idx + 1}
+                    {isScriptSelected ? `${sharedInputDataType} #${idx + 1}` : 'не визначено'}
                   </span>
                 </div>
 
-                {inputs.length > 1 && (
+                {isScriptSelected && inputs.length > 1 && (
                   <button
                     onClick={(e) => handleRemoveInputElem(idx, e)}
                     style={{ background: 'transparent', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
@@ -247,39 +252,47 @@ export function ScriptNode({ id, data, selected }) {
               position: 'relative',
               padding: '6px 8px',
               borderRadius: '6px',
-              background: isOutputGeoJSON ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-              border: `1px solid ${isOutputGeoJSON ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
+              background: !isScriptSelected
+                ? 'rgba(71, 85, 105, 0.15)'
+                : isOutputGeoJSON
+                ? 'rgba(16, 185, 129, 0.12)'
+                : 'rgba(59, 130, 246, 0.12)',
+              border: !isScriptSelected
+                ? '1px dashed rgba(148, 163, 184, 0.3)'
+                : `1px solid ${isOutputGeoJSON ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <FileType className={`w-3.5 h-3.5 ${isOutputGeoJSON ? 'text-emerald-400' : 'text-blue-400'}`} />
+              <FileType className={`w-3.5 h-3.5 ${!isScriptSelected ? 'text-slate-500' : isOutputGeoJSON ? 'text-emerald-400' : 'text-blue-400'}`} />
               <span
                 style={{
                   fontSize: '0.7rem',
                   fontFamily: 'monospace',
                   fontWeight: 700,
-                  color: isOutputGeoJSON ? '#34d399' : '#60a5fa',
+                  color: !isScriptSelected ? '#64748b' : isOutputGeoJSON ? '#34d399' : '#60a5fa',
                 }}
               >
-                {outputDataType}
+                {isScriptSelected ? outputDataType : 'не визначено'}
               </span>
             </div>
 
-            {/* Handle attached directly to the output data element block */}
+            {/* Handle attached directly to the output element */}
             <Handle
               type="source"
               position={Position.Right}
               id="out"
+              isConnectable={isScriptSelected}
               style={{
                 right: '-7px',
                 width: '12px',
                 height: '12px',
-                background: isOutputGeoJSON ? '#10b981' : '#3b82f6',
+                background: !isScriptSelected ? '#475569' : isOutputGeoJSON ? '#10b981' : '#3b82f6',
                 borderColor: '#0a0d14',
                 borderWidth: '2px',
+                cursor: isScriptSelected ? 'crosshair' : 'not-allowed',
               }}
             />
           </div>

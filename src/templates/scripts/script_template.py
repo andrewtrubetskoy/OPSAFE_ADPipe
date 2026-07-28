@@ -1,8 +1,11 @@
 from typing import Literal, Protocol
 from pydantic import BaseModel, Field
 
-DataType = Literal["csv", "geojson"]
-
+# ==============================================================================
+# ВКАЖІТЬ ТИП ДАНИХ ДЛЯ ВХОДУ ТА ВИХОДУ:
+# Оберіть один конкретний тип зі списку: Literal["csv"] або Literal["geojson"]
+# ==============================================================================
+DataType = Literal["csv"]       # Вкажіть "csv" або "geojson"
 
 # 1. Схема конфігурації для побудови GUI
 class ConfigSchema(BaseModel):

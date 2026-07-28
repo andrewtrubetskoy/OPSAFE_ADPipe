@@ -6,12 +6,54 @@ const INITIAL_MOCK_SCRIPT_FOLDERS = [
   { id: 2, name: 'Конвертери атрибутів', parentId: null },
 ];
 
+const STANDARD_TEMPLATE_CODE = `from typing import Literal, Protocol
+from pydantic import BaseModel, Field
+
+DataType = Literal["csv", "geojson"]
+
+# 1. Схема конфігурації для побудови GUI
+class ConfigSchema(BaseModel):
+    threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        multiple_of=0.1,
+        title="Поріг чутливості"
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        multiple_of=1,
+        title="Кількість спроб"
+    )
+
+# 2. Інтерфейс зворотного зв'язку
+class FeedbackHandler(Protocol):
+    def update_progress(self, percent: float, stage_description: str) -> None:
+        ...
+
+# 3. Головна функція
+def process_data(
+    data_type: DataType,
+    input_data_items_list: list[str],
+    config: ConfigSchema,
+    feedback: FeedbackHandler
+) -> tuple[bool, str]:
+    try:
+        feedback.update_progress(0.0, f"Старт обробки файлу типу {data_type}")
+        processed_lines = [item.strip().upper() for item in input_data_items_list]
+        feedback.update_progress(100.0, "Завершено успішно")
+        return True, "\\n".join(processed_lines)
+    except Exception as e:
+        return False, f"Помилка під час виконання: {str(e)}"`;
+
 const INITIAL_MOCK_SCRIPTS = [
   {
     id: 101,
     name: 'Фільтр об\'єктів Python',
     description: 'Обробка та фільтрація буферної зони навколо об\'єктів',
-    code: `def process(input_data, buffer_dist=50.0):\n    """Побудова буферної зони навколо векторних об'єктів"""\n    if input_data is None:\n        return None\n    buffered = input_data.copy()\n    buffered['geometry'] = buffered.geometry.buffer(buffer_dist)\n    return buffered`,
+    code: STANDARD_TEMPLATE_CODE,
     inputType: 'geojson',
     outputType: 'geojson',
     folderId: 1,
@@ -20,7 +62,7 @@ const INITIAL_MOCK_SCRIPTS = [
     id: 102,
     name: 'Конвертер атрибутів CSV',
     description: 'Конвертація атрибутів та розрахунок статистики',
-    code: `import pandas as pd\n\ndef process(input_data_list):\n    """Конвертація списку таблиць у підсумковий датафрейм"""\n    results = []\n    for item in input_data_list:\n        if isinstance(item, pd.DataFrame):\n            results.append(item)\n    return pd.concat(results, ignore_index=True) if results else pd.DataFrame()`,
+    code: STANDARD_TEMPLATE_CODE,
     inputType: 'csv',
     outputType: 'csv',
     folderId: 2,
@@ -101,41 +143,39 @@ export const useScriptLibraryStore = create((set, get) => ({
     }
   },
 
+  uploadScript: async (scriptData, fileContent = '') => {
+    try {
+      let created;
+      if (scriptData instanceof FormData) {
+        created = await scriptLibraryApi.uploadScript(scriptData);
+      } else {
+        created = await scriptLibraryApi.createScript(scriptData);
+      }
+      set((state) => ({ scriptItems: [...state.scriptItems, created] }));
+      return created;
+    } catch (err) {
+      const mockScript = {
+        id: Date.now(),
+        name: scriptData.name || 'Новий скрипт',
+        description: scriptData.description || 'Скрипт з бібліотеки',
+        code: fileContent || scriptData.code || STANDARD_TEMPLATE_CODE,
+        inputType: scriptData.inputType || 'geojson',
+        outputType: scriptData.outputType || 'geojson',
+        folderId: scriptData.folderId || null,
+      };
+      set((state) => ({ scriptItems: [...state.scriptItems, mockScript] }));
+      return mockScript;
+    }
+  },
+
   updateScriptCode: async (scriptId, newCode) => {
-    const existing = get().scriptItems.find((s) => s.id === scriptId);
-    if (!existing) return;
-    const updated = { ...existing, code: newCode };
     set((state) => ({
-      scriptItems: state.scriptItems.map((s) => (s.id === scriptId ? updated : s)),
+      scriptItems: state.scriptItems.map((s) => (s.id === scriptId ? { ...s, code: newCode } : s)),
     }));
     try {
-      await scriptLibraryApi.updateScript(updated);
+      await scriptLibraryApi.updateScript(scriptId, { code: newCode });
     } catch (err) {
-      console.warn('Backend update script error:', err);
-    }
-  },
-
-  uploadScript: async (formData) => {
-    try {
-      const uploaded = await scriptLibraryApi.uploadScript(formData);
-      set((state) => ({ scriptItems: [...state.scriptItems, uploaded] }));
-      return uploaded;
-    } catch (err) {
-      console.error('Error uploading script:', err);
-      throw err;
-    }
-  },
-
-  moveScriptToFolder: async (scriptId, folderId) => {
-    set((state) => ({
-      scriptItems: state.scriptItems.map((s) =>
-        s.id === scriptId ? { ...s, folderId } : s
-      ),
-    }));
-    try {
-      await scriptLibraryApi.moveScript(scriptId, folderId);
-    } catch (err) {
-      console.warn('Backend move script error / mock mode fallback:', err);
+      console.warn('Backend update script code error:', err);
     }
   },
 
@@ -149,5 +189,18 @@ export const useScriptLibraryStore = create((set, get) => ({
       scriptItems: state.scriptItems.filter((s) => s.id !== id),
       selectedScriptId: state.selectedScriptId === id ? null : state.selectedScriptId,
     }));
+  },
+
+  moveScriptToFolder: async (scriptId, targetFolderId) => {
+    set((state) => ({
+      scriptItems: state.scriptItems.map((s) =>
+        s.id === scriptId ? { ...s, folderId: targetFolderId } : s
+      ),
+    }));
+    try {
+      await scriptLibraryApi.moveScript(scriptId, targetFolderId);
+    } catch (err) {
+      console.warn('Backend move script error:', err);
+    }
   },
 }));
