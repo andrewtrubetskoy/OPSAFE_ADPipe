@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Trash2, Plus, Sliders, Code2, Save } from 'lucide-react';
+import { X, Trash2, Plus, Sliders, Code2, Save, FileType } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
 
 export function NodeInspector() {
@@ -21,6 +21,25 @@ export function NodeInspector() {
         [childField]: value,
       },
     });
+  };
+
+  // Script inputs helper (all inputs share uniform data type)
+  const currentInputs = data.input_data_elem_list || [{ data_type: 'geojson' }];
+  const sharedInputDataType = currentInputs[0]?.data_type || 'geojson';
+
+  const handleAddInputElem = () => {
+    updateNodeData(selectedNodeId, { input_data_elem_list: [...currentInputs, { data_type: sharedInputDataType }] });
+  };
+
+  const handleSharedInputTypeChange = (newDataType) => {
+    const updatedInputs = currentInputs.map((inp) => ({ ...inp, data_type: newDataType }));
+    updateNodeData(selectedNodeId, { input_data_elem_list: updatedInputs });
+  };
+
+  const handleDeleteInputElem = (idx) => {
+    if (currentInputs.length <= 1) return;
+    const updatedInputs = currentInputs.filter((_, i) => i !== idx);
+    updateNodeData(selectedNodeId, { input_data_elem_list: updatedInputs });
   };
 
   // Script parameters helper
@@ -109,8 +128,8 @@ export function NodeInspector() {
                 onChange={(e) => handleFieldChange('direction', e.target.value)}
                 style={inputStyle}
               >
-                <option value="out">out (Вихідний потік)</option>
-                <option value="in">in (Вхідний потік)</option>
+                <option value="out">out (Видача даних)</option>
+                <option value="in">in (Прийом даних)</option>
               </select>
             </div>
 
@@ -173,6 +192,45 @@ export function NodeInspector() {
         {/* SCRIPT NODE FIELDS */}
         {node.type === 'scriptNode' && (
           <>
+            {/* Uniform Input Data Type & List Management */}
+            <div style={{ paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#38bdf8' }}>
+                  Вхідні елементи ({ currentInputs.length })
+                </span>
+                <button onClick={handleAddInputElem} className="btn-secondary" style={{ fontSize: '0.7rem', padding: '3px 6px' }}>
+                  <Plus className="w-3 h-3 text-emerald-400" /> + Вхід
+                </button>
+              </div>
+
+              {/* Shared Single Input Data Type Selector */}
+              <div style={{ marginBottom: '8px' }}>
+                <label style={labelStyle}>Єдиний тип вхідних даних</label>
+                <select
+                  value={sharedInputDataType}
+                  onChange={(e) => handleSharedInputTypeChange(e.target.value)}
+                  style={{ ...inputStyle, borderColor: 'rgba(56, 189, 248, 0.4)', background: 'rgba(56, 189, 248, 0.08)' }}
+                >
+                  <option value="geojson">geojson (Всі входи)</option>
+                  <option value="csv">csv (Всі входи)</option>
+                </select>
+              </div>
+
+              {currentInputs.map((_, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 0, 0, 0.25)', padding: '6px 8px', borderRadius: '6px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#cbd5e1', fontFamily: 'monospace' }}>
+                    Вхід #{idx + 1}: {sharedInputDataType}
+                  </span>
+
+                  {currentInputs.length > 1 && (
+                    <button onClick={() => handleDeleteInputElem(idx)} className="btn-icon" style={{ width: '22px', height: '22px' }}>
+                      <Trash2 className="w-3 h-3 text-rose-400" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
             <div>
               <label style={labelStyle}>Вихідний тип даних (output_data_elem)</label>
               <select

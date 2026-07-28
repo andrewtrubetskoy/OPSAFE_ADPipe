@@ -67,9 +67,9 @@ const INITIAL_NODES = [
 ];
 
 const INITIAL_EDGES = [
-  { id: 'e1-2', source: 'node-stream-out-1', target: 'node-script-1', sourceHandle: 'out', targetHandle: 'in-0', animated: true, style: { stroke: '#10b981', strokeWidth: 2 } },
-  { id: 'e2-3', source: 'node-script-1', target: 'node-converter-1', sourceHandle: 'out', targetHandle: 'in', animated: true, style: { stroke: '#10b981', strokeWidth: 2 } },
-  { id: 'e3-4', source: 'node-converter-1', target: 'node-stream-in-1', sourceHandle: 'out', targetHandle: 'in', animated: true, style: { stroke: '#3b82f6', strokeWidth: 2 } },
+  { id: 'e1-2', type: 'customDeletable', source: 'node-stream-out-1', target: 'node-script-1', sourceHandle: 'out', targetHandle: 'in-0', animated: true, style: { stroke: '#10b981', strokeWidth: 2.5 } },
+  { id: 'e2-3', type: 'customDeletable', source: 'node-script-1', target: 'node-converter-1', sourceHandle: 'out', targetHandle: 'in', animated: true, style: { stroke: '#10b981', strokeWidth: 2.5 } },
+  { id: 'e3-4', type: 'customDeletable', source: 'node-converter-1', target: 'node-stream-in-1', sourceHandle: 'out', targetHandle: 'in', animated: true, style: { stroke: '#3b82f6', strokeWidth: 2.5 } },
 ];
 
 const MOCK_SCHEMES = [
@@ -208,28 +208,30 @@ export const useSchemeStore = create((set, get) => ({
     });
   },
 
-  addNode: (nodeType) => {
-    const id = `node-${nodeType}-${Date.now()}`;
-    // Position offset
+  addNode: (nodeType, customDirection = null) => {
+    const actualType = nodeType === 'streamInNode' || nodeType === 'streamOutNode' ? 'streamNode' : nodeType;
+    const id = `node-${actualType}-${Date.now()}`;
     const currentNodesCount = get().nodes.length;
     const position = { x: 250 + (currentNodesCount * 30) % 400, y: 150 + (currentNodesCount * 30) % 300 };
 
     let newNodeData = {};
-    if (nodeType === 'streamNode') {
+    if (actualType === 'streamNode') {
+      const direction = customDirection || (nodeType === 'streamInNode' ? 'in' : 'out');
+      const isInput = direction === 'in';
       newNodeData = {
-        name: 'Новий Потік даних',
-        desc: 'Потік вхідних або вихідних даних',
-        direction: 'out',
+        name: isInput ? 'Новий Потік (прийом даних)' : 'Новий Потік (видача даних)',
+        desc: isInput ? 'Потік прийому підсумкових даних' : 'Потік видачі початкових даних',
+        direction,
         type: 'file',
-        data_element: { data: 'file.geojson', data_type: 'geojson' },
+        data_element: { data: isInput ? 'input_table.csv' : 'file.geojson', data_type: isInput ? 'csv' : 'geojson' },
       };
-    } else if (nodeType === 'converterNode') {
+    } else if (actualType === 'converterNode') {
       newNodeData = {
         name: 'Новий Конвертер',
         input_data_element: { data_type: 'csv' },
         output_data_element: { data_type: 'geojson' },
       };
-    } else if (nodeType === 'scriptNode') {
+    } else if (actualType === 'scriptNode') {
       newNodeData = {
         name: 'Новий Python Скрипт',
         desc: 'Кастомна обробка даних на Python',
@@ -245,7 +247,7 @@ export const useSchemeStore = create((set, get) => ({
 
     const newNode = {
       id,
-      type: nodeType,
+      type: actualType,
       position,
       data: newNodeData,
     };

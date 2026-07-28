@@ -5,12 +5,11 @@ import {
   Controls,
   MiniMap,
   addEdge,
-  useNodesState,
-  useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { nodeTypes } from '../nodes';
+import { edgeTypes } from '../edges';
 import { useSchemeStore } from '../../store/useSchemeStore';
 import { CanvasToolbar } from './CanvasToolbar';
 import { NodeInspector } from './NodeInspector';
@@ -21,7 +20,6 @@ export function SchemeCanvas() {
   const onNodesChange = useCallback(
     (changes) => {
       setNodes((nds) => {
-        // apply changes manually or via reactflow helper
         return nds.map((node) => {
           const change = changes.find((c) => c.id === node.id);
           if (!change) return node;
@@ -49,7 +47,6 @@ export function SchemeCanvas() {
 
   const onConnect = useCallback(
     (connection) => {
-      // Validate data element type matching between source & target nodes!
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
 
@@ -72,22 +69,30 @@ export function SchemeCanvas() {
       } else if (targetNode.type === 'converterNode') {
         targetDataType = targetNode.data?.input_data_element?.data_type;
       } else if (targetNode.type === 'scriptNode') {
-        // match target handle index if available
-        targetDataType = targetNode.data?.input_data_elem_list?.[0]?.data_type || 'geojson';
+        const handleIdxStr = connection.targetHandle ? connection.targetHandle.replace('in-', '') : '0';
+        const idx = parseInt(handleIdxStr, 10) || 0;
+        targetDataType = targetNode.data?.input_data_elem_list?.[idx]?.data_type || 'geojson';
       }
 
-      // If data types don't match, set stroke color warning or reject
+      // Type matching validation
       const isTypeMatch = sourceDataType === targetDataType;
       const strokeColor = isTypeMatch ? (sourceDataType === 'geojson' ? '#10b981' : '#3b82f6') : '#f43f5e';
 
       const newEdge = {
         ...connection,
         id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+        type: 'customDeletable',
         animated: isTypeMatch,
         style: { stroke: strokeColor, strokeWidth: isTypeMatch ? 2.5 : 3 },
       };
 
-      setEdges((eds) => addEdge(newEdge, eds));
+      setEdges((eds) => {
+        // Enforce 1 connection per input handle rule: filter out any existing edge connected to the SAME target handle
+        const filteredEdges = eds.filter(
+          (e) => !(e.target === connection.target && e.targetHandle === connection.targetHandle)
+        );
+        return addEdge(newEdge, filteredEdges);
+      });
     },
     [nodes, setEdges]
   );
@@ -109,6 +114,7 @@ export function SchemeCanvas() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, RefreshCw, Code2, Plus } from 'lucide-react';
+import { Database, RefreshCw, Code2, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useSchemeStore } from '../../store/useSchemeStore';
 
 export function CanvasToolbar() {
@@ -25,8 +25,9 @@ export function CanvasToolbar() {
         Інструменти
       </div>
 
+      {/* 1. STREAM OUT BUTTON AT THE TOP (ВИДАЧА ДАНИХ) */}
       <button
-        onClick={() => addNode('streamNode')}
+        onClick={() => addNode('streamOutNode')}
         className="btn-secondary"
         style={{
           padding: '8px 12px',
@@ -36,13 +37,14 @@ export function CanvasToolbar() {
           borderColor: 'rgba(16, 185, 129, 0.25)',
           color: '#34d399',
         }}
-        title="Створити новий потік даних"
+        title="Створити потік видачі даних (direction: out)"
       >
         <Plus className="w-4 h-4 text-emerald-400" />
-        <Database className="w-4 h-4 text-emerald-400" />
-        <span>Потік</span>
+        <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+        <span>Потік (видача даних)</span>
       </button>
 
+      {/* 2. CONVERTER BUTTON */}
       <button
         onClick={() => addNode('converterNode')}
         className="btn-secondary"
@@ -61,6 +63,7 @@ export function CanvasToolbar() {
         <span>Конвертер</span>
       </button>
 
+      {/* 3. SCRIPT BUTTON */}
       <button
         onClick={() => addNode('scriptNode')}
         className="btn-secondary"
@@ -77,6 +80,25 @@ export function CanvasToolbar() {
         <Plus className="w-4 h-4 text-amber-400" />
         <Code2 className="w-4 h-4 text-amber-400" />
         <span>Скрипт</span>
+      </button>
+
+      {/* 4. STREAM IN BUTTON AT THE BOTTOM (ПРИЙОМ ДАНИХ) */}
+      <button
+        onClick={() => addNode('streamInNode')}
+        className="btn-secondary"
+        style={{
+          padding: '8px 12px',
+          fontSize: '0.8rem',
+          justifyContent: 'flex-start',
+          background: 'rgba(59, 130, 246, 0.1)',
+          borderColor: 'rgba(59, 130, 246, 0.25)',
+          color: '#60a5fa',
+        }}
+        title="Створити потік прийому даних (direction: in)"
+      >
+        <Plus className="w-4 h-4 text-blue-400" />
+        <ArrowDownRight className="w-4 h-4 text-blue-400" />
+        <span>Потік (прийом даних)</span>
       </button>
     </div>
   );
